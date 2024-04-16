@@ -1,0 +1,93 @@
+<!-- public/expenseTracker.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+</head>
+<body>
+    <h1>Expense Tracker</h1>
+
+    <!-- Expense Form -->
+    <h2>Add Expense</h2>
+    <form id="expenseForm">
+        <label for="expenseAmount">Amount:</label><br>
+        <input type="text" id="expenseAmount" name="expenseAmount"><br>
+        <label for="expenseDescription">Description:</label><br>
+        <input type="text" id="expenseDescription" name="expenseDescription"><br>
+        <label for="expenseCategory">Category:</label><br>
+        <select id="expenseCategory" name="expenseCategory">
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Entertainment">Entertainment</option>
+            <!-- Add more options as needed -->
+        </select><br>
+        <button type="submit">Add Expense</button>
+    </form>
+
+    <!-- Expense List -->
+    <h2>Expense List</h2>
+    <ul id="expenseList">
+        <!-- Dynamic content for expense list will be added here -->
+    </ul>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // Function to delete an expense
+        async function deleteExpense(expenseId) {
+            try {
+                const response = await axios.delete(`/deleteExpense/${expenseId}`);
+                alert(response.data);
+                // Reload the expense list after deleting an expense
+                loadExpenseList();
+            } catch (error) {
+                alert(error.response.data);
+            }
+        }
+
+        // Function to load expense list from server
+        async function loadExpenseList() {
+            try {
+                const response = await axios.get('/getExpenses');
+                const expenses = response.data;
+                const expenseList = document.getElementById('expenseList');
+                expenseList.innerHTML = '';
+                expenses.forEach(expense => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${expense.description}: $${expense.amount} (${expense.category}) `;
+                    // Add delete button for each expense entry
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.onclick = () => deleteExpense(expense.id);
+                    listItem.appendChild(deleteButton);
+                    expenseList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Failed to load expense list', error);
+            }
+        }
+
+        // Initial load of expense list
+        loadExpenseList();
+
+        // Expense Form Submission
+        const expenseForm = document.getElementById('expenseForm');
+        expenseForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const amount = document.getElementById('expenseAmount').value;
+            const description = document.getElementById('expenseDescription').value;
+            const category = document.getElementById('expenseCategory').value;
+
+            try {
+                const response = await axios.post('/addExpense', { amount, description, category });
+                alert(response.data);
+                // Reload the expense list after adding a new expense
+                loadExpenseList();
+            } catch (error) {
+                alert(error.response.data);
+            }
+        });
+    </script>
+</body>
+</html>
