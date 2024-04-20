@@ -10,6 +10,9 @@
     <h1>Expense Tracker</h1>
     <h2 id="userName"></h2> <!-- Display user's name here -->
 
+    <!-- Buy Premium Membership Button -->
+    <button id="buyPremiumButton">Buy Premium Membership</button>
+
     <!-- Expense Form -->
     <h2>Add Expense</h2>
     <form id="expenseForm">
@@ -35,6 +38,7 @@
     </ul>
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
         // Function to fetch user's name after login
         async function fetchUserName() {
@@ -49,6 +53,48 @@
 
         // Call fetchUserName function when the page loads
         window.onload = fetchUserName;
+
+        // Buy Premium Membership Button Click Event
+        document.getElementById('buyPremiumButton').addEventListener('click', async () => {
+            try {
+                const response = await axios.post('/createOrder');
+                const orderId = response.data.id;
+                const options = {
+                    key: 'rzp_test_nKOF0JuHBBkse8',
+                    amount: response.data.amount,
+                    currency: 'INR',
+                    name: 'Premium Membership',
+                    description: 'Upgrade to premium',
+                    order_id: orderId,
+                    handler: async function (response) {
+                        try {
+                            const updatedResponse = await axios.post('/updateOrderStatus', { orderId });
+                            alert('Transaction successful, Congrats! You are our Premium Member');
+                            // Optionally, perform additional actions after successful transaction
+                        } catch (error) {
+                            console.error('Failed to update order status:', error);
+                            alert('TRANSACTION FAILED, Please Try Again');
+                        }
+                    },
+                    prefill: {
+                        name: 'Your Name',
+                        email: 'your_email@example.com',
+                        contact: '1234567890'
+                    },
+                    notes: {
+                        address: 'Razorpay Corporate Office'
+                    },
+                    theme: {
+                        color: '#F37254'
+                    }
+                };
+                const rzp1 = new Razorpay(options);
+                rzp1.open();
+            } catch (error) {
+                console.error('Failed to create order:', error);
+                alert('Failed to create order');
+            }
+        });
 
         // Function to delete an expense
         async function deleteExpense(expenseId) {

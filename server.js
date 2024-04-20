@@ -5,9 +5,16 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const session = require('express-session');
+const Razorpay = require('razorpay');
+
 
 const app = express();
 const port = 8080;
+const razorpay = new Razorpay({
+    key_id: 'rzp_test_nKOF0JuHBBkse8',
+    key_secret: 'CJz84d8yuKeer7YQgAPJoATH'
+});
+
 
 // Middleware
 app.use(bodyParser.json());
@@ -159,6 +166,58 @@ app.get('/getExpenses', authenticateToken, (req, res) => {
         res.status(200).json(results);
     });
 });
+
+
+// Create Order Route
+app.post('/createOrder', authenticateToken, async (req, res) => {
+    const amount = 50000; // Amount in smallest currency unit (e.g., paise for INR)
+    const currency = 'INR';
+    const receipt = 'order_rcptid_' + Math.floor(Math.random() * 1000); // Generate a random receipt ID
+
+    const options = {
+        amount: amount,
+        currency: currency,
+        receipt: receipt
+    };
+
+    try {
+        const order = await razorpay.orders.create(options);
+        res.status(200).json(order);
+    } catch (error) {
+        console.error('Failed to create order:', error);
+        res.status(500).send('Failed to create order');
+    }
+});
+
+// Update Order Status Route (on successful payment)
+app.post('/updateOrderStatus', authenticateToken, async (req, res) => {
+    const orderId = req.body.orderId;
+    const userId = req.user.id;
+
+    try {
+        // Handle successful payment logic here
+        res.status(200).send('Order status updated successfully');
+    } catch (error) {
+        console.error('Failed to update order status:', error);
+        res.status(500).send('Failed to update order status');
+    }
+});
+
+// Update Order Status Route (on failed payment)
+app.post('/updateOrderStatusFailed', authenticateToken, async (req, res) => {
+    const orderId = req.body.orderId;
+    const userId = req.user.id;
+
+    try {
+        // Handle failed payment logic here
+        res.status(200).send('Order status updated successfully');
+    } catch (error) {
+        console.error('Failed to update order status:', error);
+        res.status(500).send('Failed to update order status');
+    }
+});
+
+
 
 // Start server
 app.listen(port, () => {
