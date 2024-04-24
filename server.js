@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const mysql = require('mysql');
@@ -7,14 +8,12 @@ const jwt = require('jsonwebtoken');
 const session = require('express-session');
 const Razorpay = require('razorpay');
 
-
 const app = express();
 const port = 8080;
 const razorpay = new Razorpay({
-    key_id: 'rzp_test_nKOF0JuHBBkse8',
-    key_secret: 'CJz84d8yuKeer7YQgAPJoATH'
+    key_id: 'rzp_test_T7qu1l1wzFOO0J',
+    key_secret: 'SI5UymdGSS19ktViMhzFZ19i'
 });
-
 
 // Middleware
 app.use(bodyParser.json());
@@ -39,7 +38,6 @@ db.connect((err) => {
     }
     console.log('Connected to MySQL database');
 });
-
 
 // User Authentication Middleware
 function authenticateToken(req, res, next) {
@@ -99,8 +97,12 @@ app.post('/login', async (req, res) => {
             const user = results[0];
             const match = await bcrypt.compare(password, user.password);
             if (match) {
+                // Check if the user is premium
+                const isPremium = user.is_premium === 1;
                 const token = jwt.sign({ id: user.id }, 'your-secret-key'); // Change this secret key
                 req.session.token = token;
+                // Set premium status in the session
+                req.session.isPremium = isPremium;
                 res.status(200).send('Login successful');
             } else {
                 res.status(401).send('Incorrect email or password');
@@ -110,6 +112,7 @@ app.post('/login', async (req, res) => {
         }
     });
 });
+
 
 // Logout Route
 app.post('/logout', (req, res) => {
@@ -167,7 +170,6 @@ app.get('/getExpenses', authenticateToken, (req, res) => {
     });
 });
 
-
 // Create Order Route
 app.post('/createOrder', authenticateToken, async (req, res) => {
     const amount = 50000; // Amount in smallest currency unit (e.g., paise for INR)
@@ -196,7 +198,15 @@ app.post('/updateOrderStatus', authenticateToken, async (req, res) => {
 
     try {
         // Handle successful payment logic here
-        res.status(200).send('Order status updated successfully');
+        // Set user's premium status in the database
+        db.query('UPDATE users SET is_premium = 1 WHERE id = ?', [userId], (err, result) => {
+            if (err) {
+                console.error('Failed to update user premium status:', err);
+                res.status(500).send('Failed to update user premium status');
+            } else {
+                res.status(200).send('Order status updated successfully');
+            }
+        });
     } catch (error) {
         console.error('Failed to update order status:', error);
         res.status(500).send('Failed to update order status');
@@ -217,6 +227,61 @@ app.post('/updateOrderStatusFailed', authenticateToken, async (req, res) => {
     }
 });
 
+// Get Leaderboard Route
+app.get('/leaderboard', (req, res) => {
+    // Check if the user is premium
+    if (req.session.isPremium) {
+        // User is premium, allow access to leaderboard
+        db.query('SELECT user_id, SUM(amount) AS totalExpense FROM expenses GROUP BY user_id ORDER BY totalExpense DESC LIMIT 10', (err, results) => {
+            if (err) {
+                console.error('Error fetching leaderboard:', err);
+                res.status(500).send('Failed to fetch leaderboard');
+            } else {
+                res.status(200).json(results);
+            }
+        });
+    } else {
+        // User is not premium, deny access to leaderboard
+        res.status(403).send('Premium feature, access denied');
+    }
+});
+
+
+
+// Get Summed Up Expenses Route
+app.get('/summedUpExpenses', checkPremium, (req, res) => {
+    db.query('SELECT user_id, SUM(amount) AS totalExpense FROM expenses GROUP BY user_id ORDER BY totalExpense DESC', (err, results) => {
+        if (err) {
+            console.error('Error fetching summed up expenses:', err);
+            res.status(500).send('Failed to fetch summed up expenses');
+        } else {
+            res.status(200).json(results);
+        }
+    });
+});
+
+
+
+// Middleware to check if user is premium
+function checkPremium(req, res, next) {
+    const userId = req.user.id;
+
+    db.query('SELECT is_premium FROM users WHERE id = ?', [userId], (err, results) => {
+        if (err) {
+            console.error('Error checking premium status:', err);
+            res.status(500).send('Failed to check premium status');
+        } else {
+            const isPremium = results[0].is_premium;
+            if (isPremium) {
+                // Set a flag in the session to indicate premium status
+                req.session.isPremium = true;
+                next();
+            } else {
+                res.status(403).send('Premium feature, access denied');
+            }
+        }
+    });
+}
 
 
 // Start server
